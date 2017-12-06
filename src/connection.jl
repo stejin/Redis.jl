@@ -1,48 +1,48 @@
-import Base.connect, Base.TCPSocket, Base.StatusActive, Base.StatusOpen
+import Base.connect, Base.TCPSocket, Base.StatusActive, Base.StatusOpen, Base.StatusPaused
 
-abstract RedisConnectionBase
-abstract SubscribableConnection <: RedisConnectionBase
+abstract type RedisConnectionBase end
+abstract type SubscribableConnection <: RedisConnectionBase end
 
 immutable RedisConnection <: SubscribableConnection
-    host::AbstractString
+    host::String
     port::Integer
-    password::AbstractString
+    password::String
     db::Integer
     socket::TCPSocket
 end
 
 immutable SentinelConnection <: SubscribableConnection
-    host::AbstractString
+    host::String
     port::Integer
-    password::AbstractString
+    password::String
     db::Integer
     socket::TCPSocket
 end
 
 immutable TransactionConnection <: RedisConnectionBase
-    host::AbstractString
+    host::String
     port::Integer
-    password::AbstractString
+    password::String
     db::Integer
     socket::TCPSocket
 end
 
 type PipelineConnection <: RedisConnectionBase
-    host::AbstractString
+    host::String
     port::Integer
-    password::AbstractString
+    password::String
     db::Integer
     socket::TCPSocket
     num_commands::Integer
 end
 
 immutable SubscriptionConnection <: RedisConnectionBase
-    host::AbstractString
+    host::String
     port::Integer
-    password::AbstractString
+    password::String
     db::Integer
-    callbacks::Dict{AbstractString, Function}
-    pcallbacks::Dict{AbstractString, Function}
+    callbacks::Dict{String, Function}
+    pcallbacks::Dict{String, Function}
     socket::TCPSocket
 end
 
@@ -92,8 +92,8 @@ function SubscriptionConnection(parent::SubscribableConnection)
     try
         socket = connect(parent.host, parent.port)
         subscription_connection = SubscriptionConnection(parent.host,
-            parent.port, parent.password, parent.db, Dict{AbstractString, Function}(),
-            Dict{AbstractString, Function}(), socket)
+            parent.port, parent.password, parent.db, Dict{String, Function}(),
+            Dict{String, Function}(), socket)
         on_connect(subscription_connection)
     catch
         throw(ConnectionException("Failed to create subscription"))
@@ -111,9 +111,9 @@ function disconnect(conn::RedisConnectionBase)
 end
 
 function is_connected(conn::RedisConnectionBase)
-    conn.socket.status == StatusActive || conn.socket.status == StatusOpen
+    conn.socket.status == StatusActive || conn.socket.status == StatusOpen || conn.socket.status == StatusPaused
 end
 
-function send_command(conn::RedisConnectionBase, command::AbstractString)
+function send_command(conn::RedisConnectionBase, command::String)
     write(conn.socket, command)
 end

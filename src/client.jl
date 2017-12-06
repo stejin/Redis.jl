@@ -1,14 +1,14 @@
 import DataStructures.OrderedSet
 
 flatten(token) = string(token)
-flatten(token::AbstractString) = token
+flatten(token::String) = token
 flatten(token::Array) = map(string, token)
 flatten(token::Set) = map(string, collect(token))
 
 # the following doesn't work in Julia v0.5
 # flatten(token::Dict) = map(string, vcat(map(collect, token)...))
 function flatten(token::Dict)
-    r=AbstractString[]
+    r=String[]
     for (k,v) in token
         push!(r, string(k))
         push!(r, string(v))
@@ -16,7 +16,7 @@ function flatten(token::Dict)
     r
 end
 
-function flatten{T<:Number, U<:AbstractString}(token::Tuple{T, U}...)
+function flatten{T<:Number, U<:String}(token::Tuple{T, U}...)
     r=[]
     for item in token
         push!(r, item[1])
@@ -30,14 +30,14 @@ flatten_command(command...) = vcat(map(flatten, command)...)
 ######## Type Conversions #########
 
 convert_response(::Type{Float64}, response) = float(response)::Float64
-convert_response(::Type{Bool}, response::AbstractString) = response == "OK" || response == "QUEUED" ? true : false
+convert_response(::Type{Bool}, response::String) = response == "OK" || response == "QUEUED" ? true : false
 convert_response(::Type{Bool}, response::Integer) = response == 1 ? true : false
-convert_response(::Type{Set{AbstractString}}, response) = Set{AbstractString}(response)
-convert_response(::Type{OrderedSet{AbstractString}}, response) = OrderedSet{AbstractString}(response)
+convert_response(::Type{Set{String}}, response) = Set{String}(response)
+convert_response(::Type{OrderedSet{String}}, response) = OrderedSet{String}(response)
 
-function convert_response(::Type{Dict{AbstractString, AbstractString}}, response)
+function convert_response(::Type{Dict{String, String}}, response)
     iseven(length(response)) || throw(ClientException("Response could not be converted to Dict"))
-    retdict = Dict{AbstractString, AbstractString}()
+    retdict = Dict{String, String}()
     for i=1:2:length(response)
         retdict[response[i]] = response[i+1]
     end
@@ -53,14 +53,14 @@ function convert_eval_response(::Any, response)
 end
 
 import Base: ==
-=={T<:AbstractString, U<:AbstractString}(A::Nullable{T}, B::Nullable{U}) = get(A) == get(B)
+=={T<:String, U<:String}(A::Nullable{T}, B::Nullable{U}) = get(A) == get(B)
 =={T<:Number, U<:Number}(A::Nullable{T}, B::Nullable{U}) = get(A) == get(B)
 
-convert_response(::Type{AbstractString}, response) = string(response)
+convert_response(::Type{String}, response) = string(response)
 convert_response(::Type{Integer}, response) = response
 
-function convert_response(::Type{Array{AbstractString, 1}}, response)
-    r = Array{AbstractString, 1}()
+function convert_response(::Type{Array{String, 1}}, response)
+    r = Array{String, 1}()
     for item in response
         push!(r, item)
     end
@@ -77,7 +77,7 @@ function convert_response{T<:Number}(::Type{Nullable{T}}, response)
     end
 end
 
-function convert_response{T<:AbstractString}(::Type{Nullable{T}}, response)
+function convert_response{T<:String}(::Type{Nullable{T}}, response)
     if response == nothing
        Nullable{T}()
     else
@@ -98,7 +98,7 @@ function convert_response{T<:Number}(::Type{Array{Nullable{T}, 1}}, response)
     end
 end
 
-function convert_response{T<:AbstractString}(::Type{Array{Nullable{T}, 1}}, response)
+function convert_response{T<:String}(::Type{Array{Nullable{T}, 1}}, response)
     if response == nothing
         Array{Nullable{T}, 1}()
    else
@@ -158,7 +158,7 @@ function subscription_loop(conn::SubscriptionConnection, err_callback::Function)
     end
 end
 
-macro redisfunction(command::AbstractString, ret_type, args...)
+macro redisfunction(command::String, ret_type, args...)
     func_name = esc(Symbol(command))
     command = lstrip(command,'_')
     command = split(command, '_')
@@ -171,6 +171,9 @@ macro redisfunction(command::AbstractString, ret_type, args...)
                 convert_response($ret_type, response)
             end
             function $(func_name)(conn::TransactionConnection, $(args...))
+                execute_command(conn, flatten_command($(command...), $(args...)))
+            end
+            function $(func_name)(conn::SubscriptionConnection, $(args...))
                 execute_command(conn, flatten_command($(command...), $(args...)))
             end
             function $(func_name)(conn::PipelineConnection, $(args...))
@@ -186,6 +189,9 @@ macro redisfunction(command::AbstractString, ret_type, args...)
             end
             function $(func_name)(conn::TransactionConnection)
                 execute_command(conn, flatten_command($(command...)))
+            end
+            function $(func_name)(conn::SubscriptionConnection, $(args...))
+                execute_command(conn, flatten_command($(command...), $(args...)))
             end
             function $(func_name)(conn::PipelineConnection)
                 execute_command_without_reply(conn, flatten_command($(command...)))

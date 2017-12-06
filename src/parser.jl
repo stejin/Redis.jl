@@ -2,7 +2,7 @@
 Formatting of incoming Redis Replies
 """
 function getline(s::TCPSocket)
-    l = chomp(readline(s))
+    l = readline(s)
     length(l) > 1 || throw(ProtocolException("Invalid response received: $l"))
     return l
 end
@@ -13,7 +13,7 @@ function read_reply(conn::RedisConnectionBase)
     return reply
 end
 
-parse_error(l::AbstractString) = throw(ServerException(l))
+parse_error(l::String) = throw(ServerException(l))
 
 function parse_bulk_string(s::TCPSocket, slen::Int)
     b = read(s, UInt8, slen+2) # add crlf
@@ -22,7 +22,8 @@ function parse_bulk_string(s::TCPSocket, slen::Int)
             "Bulk string read error: expected $len bytes; received $(length(b))"
         ))
     else
-        return bytestring(b[1:end-2])
+        #return bytestring(b[1:end-2])
+        return String(b[1:end-2])
     end
 end
 
@@ -36,7 +37,7 @@ function parse_array(s::TCPSocket, slen::Int)
     return a
 end
 
-function parseline(l::AbstractString, s::TCPSocket)
+function parseline(l::String, s::TCPSocket)
     reply_type = l[1]
     reply_token = l[2:end]
     if reply_type == '+'
@@ -46,14 +47,14 @@ function parseline(l::AbstractString, s::TCPSocket)
     elseif reply_type == '$'
         slen = parse(Int, reply_token)
         if slen == -1
-            Nullable{AbstractString}()
+            Nullable{String}()
         else
             parse_bulk_string(s, slen)
         end
     elseif reply_type == '*'
         slen = parse(Int, reply_token)
         if slen == -1
-            Nullable{AbstractString}()
+            Nullable{String}()
         else
             parse_array(s, slen)
         end
@@ -94,8 +95,8 @@ end
 
 immutable SubscriptionMessage
     message_type
-    channel::AbstractString
-    message::AbstractString
+    channel::String
+    message::String
 
     function SubscriptionMessage(reply::AbstractArray)
         notification = reply
