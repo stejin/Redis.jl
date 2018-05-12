@@ -297,12 +297,17 @@ function subscribe(conn::SubscriptionConnection, subs::Dict{String, Function})
     _subscribe(conn, collect(keys(subs)))
 end
 
-function unsubscribe(conn::SubscriptionConnection, channels...)
-    for channel in channels
-        delete!(conn.callbacks, channel)
-    end
-    execute_command(conn, unshift!(channels, "unsubscribe"))
+function unsubscribe(conn::SubscriptionConnection, channel::String)
+    delete!(conn.callbacks, channel)
+    execute_command_without_reply(conn, unshift!([channel], "unsubscribe"))
 end
+
+# function unsubscribe(conn::SubscriptionConnection, channels...)
+#     for channel in channels
+#         delete!(conn.callbacks, channel)
+#     end
+#     execute_command(conn, unshift!(channels, "unsubscribe"))
+# end
 
 function _psubscribe(conn::SubscriptionConnection, patterns::Array)
     execute_command_without_reply(conn, unshift!(patterns, "psubscribe"))
