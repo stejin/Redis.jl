@@ -1,14 +1,14 @@
 import DataStructures.OrderedSet
 
 flatten(token) = string(token)
-flatten(token::String) = token
+flatten(token::AbstractString) = token
 flatten(token::Array) = map(string, token)
 flatten(token::Set) = map(string, collect(token))
 
 # the following doesn't work in Julia v0.5
 # flatten(token::Dict) = map(string, vcat(map(collect, token)...))
 function flatten(token::Dict)
-    r=String[]
+    r=AbstractString[]
     for (k,v) in token
         push!(r, string(k))
         push!(r, string(v))
@@ -16,7 +16,7 @@ function flatten(token::Dict)
     r
 end
 
-function flatten{T<:Number, U<:String}(token::Tuple{T, U}...)
+function flatten(token::Tuple{T, U}...) where {T <: Number, U<:AbstractString}
     r=[]
     for item in token
         push!(r, item[1])
@@ -29,15 +29,16 @@ flatten_command(command...) = vcat(map(flatten, command)...)
 
 ######## Type Conversions #########
 
-convert_response(::Type{Float64}, response) = float(response)::Float64
-convert_response(::Type{Bool}, response::String) = response == "OK" || response == "QUEUED" ? true : false
+convert_response(::Type{Float64}, response::T) where {T <: AbstractString} = parse(Float64, response)::Float64
+convert_response(::Type{Float64}, response::T) where {T <: Real} = float(response)::Float64
+convert_response(::Type{Bool}, response::AbstractString) = response == "OK" || response == "QUEUED" ? true : false
 convert_response(::Type{Bool}, response::Integer) = response == 1 ? true : false
-convert_response(::Type{Set{String}}, response) = Set{String}(response)
-convert_response(::Type{OrderedSet{String}}, response) = OrderedSet{String}(response)
+convert_response(::Type{Set{AbstractString}}, response) = Set{AbstractString}(response)
+convert_response(::Type{OrderedSet{AbstractString}}, response) = OrderedSet{AbstractString}(response)
 
-function convert_response(::Type{Dict{String, String}}, response)
+function convert_response(::Type{Dict{AbstractString, AbstractString}}, response)
     iseven(length(response)) || throw(ClientException("Response could not be converted to Dict"))
-    retdict = Dict{String, String}()
+    retdict = Dict{AbstractString, AbstractString}()
     for i=1:2:length(response)
         retdict[response[i]] = response[i+1]
     end
@@ -45,52 +46,38 @@ function convert_response(::Type{Dict{String, String}}, response)
 end
 
 function convert_eval_response(::Any, response)
-    if response == nothing
-        Nullable()
-    else
-        response
-    end
+    return response
 end
 
-import Base: ==
-=={T<:String, U<:String}(A::Nullable{T}, B::Nullable{U}) = get(A) == get(B)
-=={T<:Number, U<:Number}(A::Nullable{T}, B::Nullable{U}) = get(A) == get(B)
+# import Base: ==
+# ==(A::Union{T, Nothing}, B::Union{U, Nothing}) where {T<:AbstractString, U<:AbstractString} = A == B
+# ==(A::Union{T, Nothing}, B::Union{U, Nothing}) where {T<:Number, U<:Number} = A == B
 
-convert_response(::Type{String}, response) = string(response)
+convert_response(::Type{AbstractString}, response) = string(response)
 convert_response(::Type{Integer}, response) = response
 
-function convert_response(::Type{Array{String, 1}}, response)
-    r = Array{String, 1}()
+function convert_response(::Type{Array{AbstractString, 1}}, response)
+    r = Array{AbstractString, 1}()
     for item in response
         push!(r, item)
     end
     r
 end
 
-function convert_response{T<:Number}(::Type{Nullable{T}}, response)
-    if response == nothing
-       Nullable{T}()
-   elseif issubtype(typeof(response), T)
-        Nullable{T}(response)
-    else
-       response
-    end
+function convert_response(::Type{Union{T, Nothing}}, response) where {T<:Number}
+    return response
 end
 
-function convert_response{T<:String}(::Type{Nullable{T}}, response)
-    if response == nothing
-       Nullable{T}()
-    else
-       Nullable{T}(response)
-    end
+function convert_response(::Type{Union{T, Nothing}}, response) where {T<:AbstractString}
+    return response
 end
 
 # redundant
-function convert_response{T<:Number}(::Type{Array{Nullable{T}, 1}}, response)
+function convert_response(::Type{Array{Union{T, Nothing}, 1}}, response) where {T<:Number}
     if response == nothing
-        Array{Nullable{T}, 1}()
+        Array{Union{T, Nothing}, 1}()
    else
-        r = Array{Nullable{T},1}()
+        r = Array{Union{T, Nothing}, 1}()
         for item in response
             push!(r, tryparse(T, item))
         end
@@ -98,13 +85,13 @@ function convert_response{T<:Number}(::Type{Array{Nullable{T}, 1}}, response)
     end
 end
 
-function convert_response{T<:String}(::Type{Array{Nullable{T}, 1}}, response)
+function convert_response(::Type{Array{Union{T, Nothing}, 1}}, response) where {T<:AbstractString}
     if response == nothing
-        Array{Nullable{T}, 1}()
+        Array{Union{T, Nothing}, 1}()
    else
-        r = Array{Nullable{T},1}()
+        r = Array{Union{T, Nothing}, 1}()
         for item in response
-            push!(r, Nullable{T}(item))
+            push!(r, item)
         end
         r
     end
@@ -134,7 +121,7 @@ function read_pipeline(conn::PipelineConnection)
     result
 end
 
-nullcb(err) = nothing
+nullcb(err) = @debug err
 function open_subscription(conn::RedisConnection, err_callback=nullcb)
     s = SubscriptionConnection(conn)
     @async subscription_loop(s, err_callback)
@@ -158,7 +145,7 @@ function subscription_loop(conn::SubscriptionConnection, err_callback::Function)
     end
 end
 
-macro redisfunction(command::String, ret_type, args...)
+macro redisfunction(command::AbstractString, ret_type, args...)
     func_name = esc(Symbol(command))
     command = lstrip(command,'_')
     command = split(command, '_')

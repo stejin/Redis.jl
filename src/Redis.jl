@@ -1,6 +1,6 @@
 __precompile__()
 module Redis
-using Base.Dates
+using Dates
 
 import Base.get, Base.keys, Base.time
 

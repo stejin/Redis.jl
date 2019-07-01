@@ -1,59 +1,59 @@
-import Base.connect, Base.TCPSocket, Base.StatusActive, Base.StatusOpen, Base.StatusPaused
+import Sockets.connect, Sockets.TCPSocket, Sockets.StatusActive, Sockets.StatusOpen, Base.StatusPaused
 
 abstract type RedisConnectionBase end
 abstract type SubscribableConnection <: RedisConnectionBase end
 
-immutable RedisConnection <: SubscribableConnection
-    host::String
+struct RedisConnection <: SubscribableConnection
+    host::AbstractString
     port::Integer
-    password::String
+    password::AbstractString
     db::Integer
     socket::TCPSocket
 end
 
-immutable SentinelConnection <: SubscribableConnection
-    host::String
+struct SentinelConnection <: SubscribableConnection
+    host::AbstractString
     port::Integer
-    password::String
+    password::AbstractString
     db::Integer
     socket::TCPSocket
 end
 
-immutable TransactionConnection <: RedisConnectionBase
-    host::String
+struct TransactionConnection <: RedisConnectionBase
+    host::AbstractString
     port::Integer
-    password::String
+    password::AbstractString
     db::Integer
     socket::TCPSocket
 end
 
-type PipelineConnection <: RedisConnectionBase
-    host::String
+mutable struct PipelineConnection <: RedisConnectionBase
+    host::AbstractString
     port::Integer
-    password::String
+    password::AbstractString
     db::Integer
     socket::TCPSocket
     num_commands::Integer
 end
 
-immutable SubscriptionConnection <: RedisConnectionBase
-    host::String
+struct SubscriptionConnection <: RedisConnectionBase
+    host::AbstractString
     port::Integer
-    password::String
+    password::AbstractString
     db::Integer
-    callbacks::Dict{String, Function}
-    pcallbacks::Dict{String, Function}
+    callbacks::Dict{AbstractString, Function}
+    pcallbacks::Dict{AbstractString, Function}
     socket::TCPSocket
 end
 
 function RedisConnection(; host="127.0.0.1", port=6379, password="", db=0)
-    try
+    #try
         socket = connect(host, port)
         connection = RedisConnection(host, port, password, db, socket)
         on_connect(connection)
-    catch
-        throw(ConnectionException("Failed to connect to Redis server"))
-    end
+    #catch
+    #    throw(ConnectionException("Failed to connect to Redis server"))
+    #end
 end
 
 function SentinelConnection(; host="127.0.0.1", port=26379, password="", db=0)
@@ -92,8 +92,8 @@ function SubscriptionConnection(parent::SubscribableConnection)
     try
         socket = connect(parent.host, parent.port)
         subscription_connection = SubscriptionConnection(parent.host,
-            parent.port, parent.password, parent.db, Dict{String, Function}(),
-            Dict{String, Function}(), socket)
+            parent.port, parent.password, parent.db, Dict{AbstractString, Function}(),
+            Dict{AbstractString, Function}(), socket)
         on_connect(subscription_connection)
     catch
         throw(ConnectionException("Failed to create subscription"))
@@ -114,6 +114,6 @@ function is_connected(conn::RedisConnectionBase)
     conn.socket.status == StatusActive || conn.socket.status == StatusOpen || conn.socket.status == StatusPaused
 end
 
-function send_command(conn::RedisConnectionBase, command::String)
+function send_command(conn::RedisConnectionBase, command::AbstractString)
     write(conn.socket, command)
 end

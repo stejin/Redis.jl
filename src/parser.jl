@@ -13,22 +13,21 @@ function read_reply(conn::RedisConnectionBase)
     return reply
 end
 
-parse_error(l::String) = throw(ServerException(l))
+parse_error(l::AbstractString) = throw(ServerException(l))
 
 function parse_bulk_string(s::TCPSocket, slen::Int)
-    b = read(s, UInt8, slen+2) # add crlf
+    b = read(s, slen+2) # add crlf
     if length(b) != slen + 2
         throw(ProtocolException(
             "Bulk string read error: expected $len bytes; received $(length(b))"
         ))
     else
-        #return bytestring(b[1:end-2])
         return String(b[1:end-2])
     end
 end
 
 function parse_array(s::TCPSocket, slen::Int)
-    a = Array{Any, 1}(slen)
+    a = Array{Any, 1}(undef, slen)
     for i = 1:slen
         l = getline(s)
         r = parseline(l, s)
@@ -37,7 +36,7 @@ function parse_array(s::TCPSocket, slen::Int)
     return a
 end
 
-function parseline(l::String, s::TCPSocket)
+function parseline(l::AbstractString, s::TCPSocket)
     reply_type = l[1]
     reply_token = l[2:end]
     if reply_type == '+'
@@ -47,14 +46,14 @@ function parseline(l::String, s::TCPSocket)
     elseif reply_type == '$'
         slen = parse(Int, reply_token)
         if slen == -1
-            Nullable{String}()
+            nothing
         else
             parse_bulk_string(s, slen)
         end
     elseif reply_type == '*'
         slen = parse(Int, reply_token)
         if slen == -1
-            Nullable{String}()
+            nothing
         else
             parse_array(s, slen)
         end
@@ -62,8 +61,6 @@ function parseline(l::String, s::TCPSocket)
         parse_error(reply_token)
     end
 end
-
-
 
 """
 Formatting of outgoing commands to the Redis server
@@ -93,10 +90,10 @@ baremodule SubscriptionMessageType
     const Other = 2
 end
 
-immutable SubscriptionMessage
+struct SubscriptionMessage
     message_type
-    channel::String
-    message::String
+    channel::AbstractString
+    message::AbstractString
 
     function SubscriptionMessage(reply::AbstractArray)
         notification = reply
